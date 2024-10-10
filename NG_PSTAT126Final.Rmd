@@ -1,0 +1,566 @@
+---
+title: "Noam Gonen PSTAT 126 Final Project"
+output:
+  pdf_document: 
+    latex_engine: xelatex
+  html_document: default
+date: "2024-06-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Diamonds Price Dataset
+
+```{r Diamonds}
+Diamonds.Prices2022 = read.csv("/Users/noamgonen/Desktop/pstat 126/Diamonds_Prices2022.csv", header = TRUE)
+head(Diamonds.Prices2022)
+```
+
+Above I have printed the first 6 observations in the data. To have a better understanding of the data I have described each variable, here is what i have gathered:
+
+- Carat: the unit of weight of the diamond (1 carat = 200 milligrams) 
+
+- Depth: length from the bottom tip, or culet, to the flat top surface divided by the width of the thickest part of the diamond (in percent) 
+
+- table: the length of the top flat part of the diamond divided by the width of the thickest part of the diamond (in percent)
+
+- price: How much the diamond costs in dollars
+
+- x: length of the diamond in millimeters
+
+- y: width of the diamond in millimeters
+
+- z: height of the diamond in millimeters
+
+- cut: calculated based on the depth, table, Girdle thickness, Pavilion angle, and Crown angle of the diamond. 5 possible categories, Fair, Good, Very Good, Premium, Ideal. 
+
+- color: seven possible categories, 
+D: The highest color grade,
+E: A colorless grade that is highly desirable,
+F: A colorless grade that is highly desirable,
+G: A near-colorless grade that appears colorless,
+H: A near-colorless grade,
+I: Nearly-colorless,
+J: Nearly-colorless.
+
+- clarity: measure of the purity and rarity of the stone, graded by the visibility of these characteristics under 10-power magnification. 8 possible categories,
+IF: internally flawless,
+VVS1: very very slightly included,
+VVS2: very very slightly included,
+VS1: very slightly included,
+VS2: very slightly included,
+SI1: slightly included,
+SI2: slightly included,
+I1: included.
+
+## Data Description and Descriptive Statistics
+
+Summary of the data statistics:
+
+```{r skimer}
+library(skimr)
+skim(Diamonds.Prices2022)
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(corrplot)
+library(readr)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(cluster)
+library(factoextra)
+library(FactoMineR)
+library(tinytex)
+```
+
+Summary of the new data after selecting 500 random observations:
+
+```{r random}
+set.seed(123)
+DiamondData <- Diamonds.Prices2022 %>% sample_n(500) %>% unique() %>% select(-(X))
+attach(DiamondData)
+skim(DiamondData)
+```
+
+Here we can see we have 300 rows (obs) and 10 columns (variables), 9 being the varibales that I can use to create my regression model and the 10th column is an X column to mark the observation number. 3 of the variables are character types and 7 are numeric (including the X column).
+The three character variables are cut, clarity and color, we can see we have no missing values, and the cut variable has 5 unique categories, clarity has 8 and the color variable has 7 categories.
+For the numeric variables we can see their means, standard deviations, quantiles, and a small look at their histograms which to summarize is as follows: 
+
+Carat: no missing observations, mean: 0.82, sd: 0.46, median: 0.71, range: (0.2300, 2.300), the distribution is skewed right, with very large outliers.
+
+Price: no missing observations, mean: 4082.67, sd: 4000.41, median: 2642.5, range: (383.0, 18108.0), the distribution is right skewed.
+
+Depth: no missing observations, mean: 61.85, sd: 1.33, median: 61.90, range: (57.80, 67.20), the distribution shows small and large outliers in the population, but data is centered in the middle.
+
+Table: no missing observations, mean: 57.28, sd: 2.16, median: 57.00, range: (53.00, 66.00), distribution shows a large outlier as data is skewed right.
+
+X: no missing observations, mean: 5.79, sd: 1.11, median: 5.79, range: (3.93, 8.43), data is spread out with no outliers.
+
+Y: no missing observations, mean: 5.79, sd: 1.1, median: 5.78, range: (3.96, 8.46), data is spread out with no outliers.
+
+Z: no missing observations, mean: 3.58, sd: 0.68, median: 3.54, range: (2.38, 5.28), data is spread out with no outliers.
+
+From the two summaries above, I can see that the distributions of the numerical variables weren't effected, the shapes stayed the same, the only noticeable change was in the x,y, and z variables, but that is probably due to the loss of outliars. 
+
+```{r categorical charts}
+ggplot(Diamonds.Prices2022, aes(x=color)) + geom_bar(fill='red') +  labs(x='Color')
+ggplot(DiamondData, aes(x=color)) + geom_bar(fill='blue') +  labs(x='Color')
+
+ggplot(Diamonds.Prices2022, aes(x=cut)) + geom_bar(fill='red') +  labs(x='Color')
+ggplot(DiamondData, aes(x=cut)) + geom_bar(fill='blue') +  labs(x='Color')
+
+ggplot(Diamonds.Prices2022, aes(x=clarity)) + geom_bar(fill='red') +  labs(x='Color')
+ggplot(DiamondData, aes(x=clarity)) + geom_bar(fill='blue') +  labs(x='Color')
+
+```
+
+The population data distribution (red) compared to the the sample data distribution (blue) all look nearly identical for all three of the categorical variables. Overall I would say I was able to get a representative sample data.
+
+
+
+## A Full Model Before Any Further Analysis of The Data:
+
+$price = \beta_0 + \beta_1 carat + \beta_2 cut  + \beta_3 color + \beta_4 clarity + \beta_5 depth + \beta_1 table + \beta_2 x  + \beta_3 y + \beta_4 z +  \epsilon$
+
+**Summary of Regression Model**
+```{r}
+lm1 = lm(price ~ carat + table + depth + cut + color + clarity + x + y + z)
+summary(lm1)
+```
+
+## Correlation Plots to Check for Overfitting and Multicollinearity
+
+
+```{r correlation plot}
+plot(DiamondData)
+```
+
+From the above correlation matrix, I can see that variables x, y, z, and carat have strong positive linear correlations. To check this further, I will calculate the correlation of each pair, if the variables have a correlation of 1 then they have a perfect positive linear relationship.
+```{r correlation}
+DiamondData2 <- subset(DiamondData, select = c("price", "carat", "depth", "table", "x", "y", "z"))
+corrplot(cor(DiamondData2), method = "number")
+```
+
+Above we can see the correlation between all the variables and, as assumed, price, carat, x, y, and z have very strong correlations whereas table and depth do not.
+
+Because carat, x, y and z have very strong correlations only one of them can be used in my regression model because its redundant and causes multicollinearity to use them all.
+
+## Linear Regression Models
+
+Next step is to conduct significance tests at $\alpha$ = 0.05 to test which variables are significantly related to the response variable, price. To do this I will conduct a hypothesis test to check the significance of the slope in the simple linear regression models between the numerical dependent variables and the independent variable. I will use the hypothesis:
+
+$H0: \beta_1 = 0$
+
+$H1: \beta_1 \not= 0$
+
+
+**linear model for price and carat:**
+```{r carat}
+lm_carat = lm(price ~ carat)
+summary(lm_carat)
+```
+the fitted model can be explained by the following equation:
+
+$price = -2361.6 + 7868.4 carat + \epsilon$
+
+and has a p-value less than 0.05, therefore $HO$ is rejected, and we conclude that carat has a significant relation to price. The $R^2adj$ is 0.844 which means about 84% of the variance in the dependent variable, price, can be explained by the model.
+
+
+**linear model for price and depth:**
+```{r depth}
+lm_depth = lm(price ~ depth)
+summary(lm_depth)
+```
+the fitted model can be explained by the following equation:
+
+$price = 2365.29 + 25.18 depth + \epsilon$
+
+and has a p-value greater than 0.05, therefore $HO$ is accepted, and we conclude that depth does not have a significant relation to price. The $R^2adj$ is -0.0019 which is not good, and might be something to consider for my later model.
+
+
+**linear model for price and table:**
+```{r table}
+lm_table = lm(price ~ table)
+summary(lm_table)
+```
+the fitted model can be explained by the following equation:
+
+$price = -9375.51 + 231.75 table + \epsilon$
+
+and has a p-value less than 0.05, therefore $HO$ is rejected, and we conclude that table has a significant relation to price. The $R^2adj$ 0.0147 which is not the best value, but I don't think it would hurt my model to include.
+
+
+**linear model for price and x (length):**
+```{r x}
+lm_x = lm(price ~ x)
+summary(lm_x)
+```
+the fitted model can be explained by the following equation:
+
+$price = -13912.77 + 3111.51 length + \epsilon$
+
+and has a p-value less than 0.05, therefore $HO$ is rejected, and we conclude that length has a significant relation to price. The $R^2adj$ is 0.768 which means about 76.8% of the variance in the dependent variable, price, can be explained by the model.
+
+
+**linear model for price and y (width):**
+```{r y}
+lm_y = lm(price ~ y)
+summary(lm_y)
+```
+the fitted model can be explained by the following equation:
+
+$price = -14083.71 + 3140.49 width + \epsilon$
+
+and has a p-value less than 0.05, therefore $HO$ is rejected, and we conclude that width has a significant relation to price. The $R^2adj$ is 0.7752 which means about 77.52% of the variance in the dependent variable, price, can be explained by the model.
+
+
+**linear model for price and z (height):**
+```{r z}
+lm_z = lm(price ~ z)
+summary(lm_z)
+```
+the fitted model can be explained by the following equation:
+
+$price = -13743.6 + 4983.7 height + \epsilon$
+
+and has a p-value less than 0.05, therefore $HO$ is rejected, and we conclude that height has a significant relation to price. The $R^2adj$ is 0.7605 which means about 76.05% of the variance in the dependent variable, price, can be explained by the model.
+
+Next I will find a confidence interval for the two variables price and carat.
+
+```{r}
+summary_stats <- summary(lm_carat)
+coeffs <- summary_stats$coefficients[, "Estimate"]
+standard_error <- summary_stats$coefficients[, "Std. Error"]
+t_crit <- qt(1-0.05/2, df = summary_stats$df[2])
+
+lower_bound <- coeffs - t_crit * standard_error
+upper_bound <- coeffs + t_crit * standard_error
+
+conf_int <- cbind(lower_bound, upper_bound)
+conf_int
+```
+
+Based on the results of the above code, I can say I am 96% confident that the true effect of carat on price is between 7571.296 and 8165.465 dollars per carat.
+
+## Check Assumption of Linearity, and Check for Constant variance
+
+I further check the numeric variables for linearity and for constant variance by plotting the simple linear models on a residuals versus fits plot.
+
+**Carat and Price Residual Fitted Plot**
+```{r carat assumptions}
+residuals_carat <- residuals(lm_carat)
+fitted_carat <- fitted(lm_carat)
+plot(fitted_carat, residuals_carat, xlab='Fitted', ylab = 'Residuals', main = 'Carat vs. Price | Residuals vs. Fitted')
+```
+
+This plot is very crowded on the left side and spread out on the right side which suggests a non constant variance (heteroscedasticity) which is not what we want. To try and fix this I can transform the linear model by taking the log of the model.
+
+```{r adjust slr_carat}
+slr_carat_adj <- lm(log(price)~log(carat))
+residuals_carat_adj <- residuals(slr_carat_adj)
+fitted_carat_adj <- fitted(slr_carat_adj)
+plot(fitted_carat_adj, residuals_carat_adj, xlab='Fitted', ylab = 'Residuals', main = 'Carat vs. Price | Residuals vs. Fitted Adjusted')
+```
+
+after taking the log of both carat and price we can see the spread of the plot better and we also notice no pattern, proving the assumption of linearity and constant variance.
+
+
+**Depth and Price Residual Fitted Plot**
+```{r depth assumptions}
+residuals_depth <- residuals(lm_depth)
+fitted_depth <- fitted(lm_depth)
+plot(fitted_depth, residuals_depth, xlab='Fitted', ylab = 'Residuals', main = 'Depth vs. Price | Residuals vs. Fitted')
+```
+
+This is not centered around 0, and not very spread out which is not what we want. To try and fix this I can transform the linear model by taking the log once again.
+
+```{r adjust slr_depth}
+slr_depth_adj <- lm(log(price)~log(depth))
+residuals_depth_adj <- residuals(slr_depth_adj)
+fitted_depth_adj <- fitted(slr_depth_adj)
+plot(fitted_depth_adj, residuals_depth_adj, xlab='Fitted', ylab = 'Residuals', main = 'Depth vs. Price | Residuals vs. Fitted Adjusted')
+```
+
+This definitely made the plot a lot better, we can now see a constant variance and linearity.
+
+**Table and Price Residual Fitted Plot**
+```{r table assumptions}
+residuals_table <- residuals(lm_table)
+fitted_table <- fitted(lm_table)
+plot(fitted_table, residuals_table, xlab='Fitted', ylab = 'Residuals', main = 'Table vs. Price | Residuals vs. Fitted')
+```
+
+This plot is showing the points in vertical lines which is normal for this variable since the table variable only has whole numbers. I can transform this as well by taking the log to make the points more continuous.
+
+```{r adjust slr_table}
+slr_table_adj <- lm(log(price)~log(table))
+residuals_table_adj <- residuals(slr_table_adj)
+fitted_table_adj <- fitted(slr_table_adj)
+plot(fitted_table_adj, residuals_table_adj, xlab='Fitted', ylab = 'Residuals', main = 'Table vs. Price | Residuals vs. Fitted Adjusted')
+```
+
+Now we can see the spread of the plot better and we also notice no pattern, proving the assumption of linearity and constant variance.
+
+
+**Length and Price Residual Fitted Plot**
+```{r x assumptions}
+residuals_x <- residuals(lm_x)
+fitted_x <- fitted(lm_x)
+plot(fitted_x, residuals_x, xlab='Fitted', ylab = 'Residuals', main = 'Length vs. Price | Residuals vs. Fitted')
+```
+
+The x (length) variable is having the same issue as the carat plot above.
+
+```{r adjust slr_x}
+slr_x_adj <- lm(log(price)~x)
+residuals_x_adj <- residuals(slr_x_adj)
+fitted_x_adj <- fitted(slr_x_adj)
+plot(fitted_x_adj, residuals_x_adj, xlab='Fitted', ylab = 'Residuals', main = 'Length vs. Price | Residuals vs. Fitted Adjusted')
+```
+
+However unlike the carat plot, once transformed the plot is looking much better, its way more spread out, and there is no noticeable pattern, proving the assumption of linearity and constant variance
+
+
+**Width and Price Residual Fitted Plot**
+```{r y assumptions}
+residuals_y <- residuals(lm_y)
+fitted_y <- fitted(lm_y)
+plot(fitted_y, residuals_y, xlab='Fitted', ylab = 'Residuals', main = 'Width vs. Price | Residuals vs. Fitted')
+```
+
+same as above
+
+```{r adjust slr_y}
+slr_y_adj <- lm(log(price)~y)
+residuals_y_adj <- residuals(slr_y_adj)
+fitted_y_adj <- fitted(slr_y_adj)
+plot(fitted_y_adj, residuals_y_adj, xlab='Fitted', ylab = 'Residuals', main = 'Width vs. Price | Residuals vs. Fitted Adjusted')
+```
+
+same conclusion. Proving the assumption of linearity and constant variance.
+
+
+**Height and Price Residual Fitted Plot**
+```{r z assumptions}
+residuals_z <- residuals(lm_z)
+fitted_z <- fitted(lm_z)
+plot(fitted_z, residuals_z, xlab='Fitted', ylab = 'Residuals', main = 'Height vs. Price | Residuals vs. Fitted')
+```
+
+same as above
+
+```{r adjust slr_z}
+slr_z_adj <- lm(log(price)~z)
+residuals_z_adj <- residuals(slr_z_adj)
+fitted_z_adj <- fitted(slr_z_adj)
+plot(fitted_x_adj, residuals_z_adj, xlab='Fitted', ylab = 'Residuals', main = 'Height vs. Price | Residuals vs. Fitted Adjusted')
+```
+
+Same conclusion. Proving the assumption of linearity and constant variance.
+
+
+## Checking for Normality
+
+Next I need to check for normality to make sure the error term is normally distributed
+
+**Carat Normality Plot**
+```{r carat normality}
+qqnorm(residuals_carat_adj)
+```
+
+**Depth Normality Plot**
+```{r depth normality}
+qqnorm(residuals_depth_adj)
+```
+
+**Table Normality Plot**
+```{r table normality}
+qqnorm(residuals_table_adj)
+```
+
+**Length Normality Plot**
+```{r table x}
+qqnorm(residuals_x_adj)
+```
+
+**Width Normality Plot**
+```{r table y}
+qqnorm(residuals_y_adj)
+```
+
+**Height Normality Plot**
+```{r table z}
+qqnorm(residuals_z_adj)
+```
+
+All the normality plots have a strong linear relationship when I transform the response variable. This tells me they all follow the normality assumption.
+
+
+After testing all the error assumptions: constant variance, linear, and normally distributed. All of my variables after undergoing a transformation were able to pass all the assumptions, and are all candidates to use in my final model.
+
+**Summary of Adjusted Variables**
+```{r summaries adjusted}
+summary(slr_carat_adj)
+summary(slr_depth_adj)
+summary(slr_table_adj)
+summary(slr_x_adj)
+summary(slr_y_adj)
+summary(slr_z_adj)
+```
+
+Here we can see how our significance and the $R^2adj$ values have changed. Depth, even though now fits the error assumptions, still does not have a significant effect on price, so we will rule that out. Table's significance has grown, and the $R^2adj$ grew which is good for my model.  
+
+
+
+
+## Dummy Variables
+
+**linear model for price and cut:**
+```{r cut}
+lm_cut = lm(log(price) ~ log(carat) + cut)
+summary(lm_cut)
+```
+the fitted model can be explained by the following equation:
+
+$price = -4367.3 + 8058.1carat + 1642.1 cutGood - 2096.7 cutIdeal + 1547.6 cutPremium + 2096.4 cutVeryGood + \epsilon$
+
+and has a p-value less than 0.05, therefore $HO$ is rejected, and we conclude that cut has a significant relation to price
+
+
+**linear model for price and color:**
+```{r color}
+lm_color = lm(log(price) ~ log(carat) + color)
+summary(lm_color)
+```
+the fitted model can be explained by the following equation:
+
+$price = 3517 -443.8 colorE + 616.2 colorF -163.7colorG + 1047.9colorH + 1811.3 colorI + 1047.3 colorJ+ \epsilon$
+
+and has a p-value less than 0.05, therefore $HO$ is rejected, and we conclude that color has a significant relation to price
+
+
+**linear model for price and clarity:**
+```{r clarity}
+lm_clarity = lm(log(price) ~ log(carat) + clarity)
+summary(lm_clarity)
+```
+the fitted model can be explained by the following equation:
+
+$price = 4055.8 -2082.8 clarityIF + 81.7 claritySI1 + 1102.0 claritySI2 - 536 clarityVS1 - 132.7 clarityVS2 - 1154.6 clarityVVS1 - 483.7clarityVVS2 + \epsilon$
+
+and has a p-value less than 0.05, therefore $HO$ is rejected, and we conclude that clarity has a significant relation to price
+
+Overall I would say color and clarity are the best categorical variables as they have the smallest p values and the highest $R^2adj$, however cut is also a good variable in the model.
+
+
+## Adding to the Carat Model
+
+the $R^2adj$ value for the transformed carat price model in 0.9377, I will now test the change in this value when I add more variables into the model. I already saw the effect when adding the categorical variables. The value of $R^2adj$ went up to 0.941 with cut, 0.948 with color, and 0.967 with clarity. 
+
+```{r, echo=FALSE, results='hide'}
+lm2 = lm(log(price) ~ log(carat) + log(carat) + log(depth) + log(table)  + cut + clarity + color)
+summary(lm2)
+```
+Adding just the variable table increased $R^2adj$ to 0.9382, adding just x increased to 0.9382, just y increased it to 0.9391, and z increased it to 0.9377. Surprisingly adding depth increased the $R^2adj$ value the most.
+
+adding depth and table to the price~carat model increased it to 0.9405, adding x, y, or z to that model did not increase the $R^2adj$ value so those get emitted.
+
+Next let's try adding the categorical variables to the price~ carat + depth + table model. 
+
+x and y to the price~carat model all improved my $R^2$ value, however adding z to the model did not. This tells me there is multicollinearity with the z variable and carat. Adding cut increased it to 0.9416, clarity increased it to 0.9684 and including color increases it even higher to 0.985.
+
+However, I noticed when running the summary that table and depth were not significant in my model so I removed them and instead added z. This ended up giving me a model with an $R^2adj$ of 0.9853.
+
+## Part 3
+
+After completing the tests above, I have decided this is the best model:
+
+$$ log(price) = \beta_0 + \beta_1log(carat) + \beta_2color + \beta_3clarity + \beta_4cut + \beta_5z + \epsilon $$
+
+```{r}
+lm2 = lm(log(price) ~ log(carat) + z + cut + clarity + color)
+summary(lm2)
+```
+
+Transforming the response variable by taking the log of price, and the log of carat helped increase the $R^2adj$ value, so I will continue to use this transformation. I also noticed including table and depth didn't help my model due to the lack of correlation to price causing overfitting, and x and y were not helpful because of their strong correlation to carat which caused multicollinearity.
+
+## AIC
+
+Now I will create a model using criterion based methods to select the variables. I will start by using Akaike Information Criterion (AIC) to tell me which predictors to select. Below I have generated models using three different testing methods: backward elimination, forward selection, and step wise methods.
+
+
+**AIC Backward Elimination**
+
+```{r AIC backwards}
+full_model <- lm(log(price)~., DiamondData)
+step(full_model, direction='backward')
+backElim_model <- lm(log(price) ~ carat + cut + color + clarity + table + x + z, data = DiamondData)
+summary(backElim_model)
+```
+
+I can see that from using backward elimination, the model with the lowest AIC removed the predictors of depth and y, and provides a model with an $R^2adj$ of 0.9851 and AIC = -2062.76. The model backwards elimination suggests is:
+
+$$ log(price) = \beta_0 + \beta_1carat + \beta_2cut + \beta_3color + \beta_4clarity + \beta_5table + \beta_6x + \beta_7z + \epsilon $$
+**AIC Forward Selection**
+
+```{r AIC forward}
+null_model <- lm(log(price)~1, DiamondData)
+step(null_model, direction='forward', scope = formula(full_model))
+forward_model <- lm(formula = log(price) ~ y + clarity + color + z + carat + 
+    x + cut + table, data = DiamondData)
+summary(forward_model)
+```
+
+Forward selection provided me with a different model where they did not include depth. The $R^2adj$ of this model is also 0.9851 and AIC = -2056.93, and it looks like this:
+
+$$ log(price) = \beta_0 + \beta_1y + \beta_2clarity + \beta_3color + \beta_4z + \beta_5carat + \beta_6x + \beta_7cut + \beta_8table + \epsilon $$
+**AIC Step Wise Regression**
+
+```{r AIC step wise}
+null_model <- lm(log(price)~1, DiamondData)
+step(null_model, direction='both', scope = formula(full_model))
+stepWise_model <- lm(formula = log(price) ~ clarity + color + z + carat + x + 
+    cut + table, data = DiamondData)
+summary(stepWise_model) 
+```
+
+Step Wise Regression also removed depth and y from the model. And this model also has a $R^2adj$ value of 0.9851 and AIC = -2062.76. The suggested model looks like this:
+
+$$ log(price) = \beta_0 + \beta_1clarity + \beta_2color + \beta_3z + \beta_4carat + \beta_5x + \beta_6cut + \beta_7table + \epsilon $$
+
+
+## Comparing The Models
+
+Out of the three models that I created using AIC, they all had the same $R^2adj$ value of 0.9851, however the backward selection model and the step wise regression produced the same model and it had one less predictor, y. This model is not far of from the one I created except it includes table and doesn't take the log of carat, and the model I created had a slightly higher $R^2adj$ value. But to make a decision I will run a test to check the AIC value and the BIC value of the three models: my model, forward model, and step wise/backward model.
+
+```{r}
+AIC(forward_model)
+AIC(stepWise_model)
+AIC(lm2)
+BIC(forward_model)
+BIC(stepWise_model)
+BIC(lm2)
+```
+
+Out of the three models, the model I created where I removed table, y and depth as well as took the log of carat has the lowest AIC and BIC values which is ideal for a model. And as stated before it had the highest $R^2adj$. 
+
+## Confidence Interval Estimates
+
+Next I will look at the confidence intervals for each of my predictors with the formula: 
+
+$$\hat{\beta}_1-t(\alpha / 2, n-2) \operatorname{se}\left(\hat{\beta}_1\right) \leq \beta_1 \leq \hat{\beta}_1+t(\alpha / 2, n-2) \operatorname{se}\left(\hat{\beta}_1\right)$$ 
+
+```{r}
+confint(lm2)
+head(exp(predict(lm2, interval = "confidence", level = .95)))
+head(exp(predict(lm2, interval = "prediction", level = .95)))
+```
+After calculating the confidence interval and the prediction interval, I can see there ranges differ a lot. the prediction interval is way wider. This is because the prediction interval depends on both the error from the fitted model as well as the error associated with the future observations.
+
+## Final Model
+$$ log(price) = \beta_0 + \beta_1log(carat) + \beta_2color + \beta_3clarity + \beta_4cut + \beta_5z + \epsilon $$
+Throughout this analysis of the data, I investigated the effect of 9 variables on one response variable. From the beginning I was able to rule out two of the three dimension variables x,y, and z due to mullticollinearity, which makes sense due to the round shape of the diamond. When one dimension grows so do the others. I also was able to rule out depth from my model because it was not significant and did not have much correlation with price. Later in my analysis I noticed I needed to transform some of my variables like price and carat to follow the error assumption of a consistent variance. After putting my model together I noticed that table was hurting my model because it wasn't as significant as the other variables and it was causing overfitting. Removing table increased the fit of my model and I was able to create a model where 98.53% of the variance in the dependent variable could be explained by the model.
+
